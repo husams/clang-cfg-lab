@@ -29,7 +29,7 @@ import os
 import sys
 from pathlib import Path
 
-MODULES = ["p02", "p34", "p567", "cfg"]
+MODULES = ["p02", "p34", "p567", "p08", "cfg"]
 _HERE = Path(__file__).resolve().parent
 _loaded: list | None = None
 

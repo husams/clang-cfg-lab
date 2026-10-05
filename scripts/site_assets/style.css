@@ -30,6 +30,13 @@
   --gv-f: #ee6b6b;
   --gv-back: #a885f0;
   --gv-eh: #f0883e;
+  /* call graphs (Part 8): root, recursion and sink reuse the back / eh hues, the rest are new */
+  --gv-root: #9fb0c9;
+  --gv-recursive: var(--gv-back);
+  --gv-sink: var(--gv-eh);
+  --gv-indirect: #e879b9;
+  --gv-cha: var(--gv-cond);
+  --gv-xtu: #2dd4bf;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -60,6 +67,9 @@ html[data-theme="light"] {
   --gv-f: #c0392b;
   --gv-back: #6d3fc0;
   --gv-eh: #c2570c;
+  --gv-root: #4f5f78;
+  --gv-indirect: #b5338a;
+  --gv-xtu: #0f766e;
 }
 
 * { box-sizing: border-box; }
@@ -358,6 +368,10 @@ html.gv-lock { overflow: hidden; }
 .gv-svg .cluster path, .gv-svg .cluster polygon { fill: color-mix(in srgb, var(--gv-ink) 3%, transparent); stroke: var(--gv-cluster-bd); stroke-width: 1px; }
 .gv-svg .cluster text { fill: var(--gv-muted); font-family: var(--sans); font-weight: 600; }
 .gv-svg .cluster.group path, .gv-svg .cluster.group polygon { fill: color-mix(in srgb, var(--gv-accent) 6%, transparent); stroke: color-mix(in srgb, var(--gv-accent) 45%, var(--gv-cluster-bd)); }
+.gv-svg .cluster.scc path, .gv-svg .cluster.scc polygon { fill: color-mix(in srgb, var(--gv-recursive) 7%, transparent); stroke: color-mix(in srgb, var(--gv-recursive) 65%, var(--gv-cluster-bd)); stroke-dasharray: 6 3; }
+.gv-svg .cluster.scc text { fill: var(--gv-recursive); }
+.gv-svg .cluster.tu path, .gv-svg .cluster.tu polygon { fill: color-mix(in srgb, var(--gv-xtu) 6%, transparent); stroke: color-mix(in srgb, var(--gv-xtu) 60%, var(--gv-cluster-bd)); stroke-width: 1.4px; }
+.gv-svg .cluster.tu text { fill: var(--gv-xtu); }
 .gv-svg .graph > polygon { fill: none; stroke: none; }
 
 /* node classes */
@@ -367,6 +381,12 @@ html.gv-lock { overflow: hidden; }
 .gv-svg .node.note path, .gv-svg .node.note polygon { stroke-dasharray: 4 3; }
 .gv-svg .node.api { --n-fill: color-mix(in srgb, var(--gv-accent) 12%, var(--gv-node)); --n-line: color-mix(in srgb, var(--gv-accent) 65%, var(--gv-node-bd)); }
 .gv-svg .node.data { --n-fill: color-mix(in srgb, var(--gv-data) 12%, var(--gv-node)); --n-line: color-mix(in srgb, var(--gv-data) 65%, var(--gv-node-bd)); }
+.gv-svg .node.root { --n-fill: color-mix(in srgb, var(--gv-root) 16%, var(--gv-node)); --n-line: var(--gv-root); --n-sw: 1.8px; }
+.gv-svg .node.root text { font-style: italic; }
+.gv-svg .node.recursive { --n-fill: color-mix(in srgb, var(--gv-recursive) 12%, var(--gv-node)); --n-line: var(--gv-recursive); --n-sw: 1.8px; }
+.gv-svg .node.external { --n-fill: none; --n-line: var(--gv-muted); }
+.gv-svg .node.external path, .gv-svg .node.external polygon { stroke-dasharray: 5 3; }
+.gv-svg .node.sink { --n-fill: color-mix(in srgb, var(--gv-sink) 14%, var(--gv-node)); --n-line: var(--gv-sink); --n-sw: 2.2px; }
 .gv-svg .node.hl { --n-line: var(--gv-accent); --n-sw: 2.6px; }
 .gv-svg .node.dim { opacity: .45; }
 
@@ -380,6 +400,13 @@ html.gv-lock { overflow: hidden; }
 .gv-svg .edge.weak { --e: var(--gv-muted); --e-ink: var(--gv-muted); --e-sw: 1px; }
 .gv-svg .edge.weak path:not(.gv-hit) { stroke-dasharray: 4 3; }
 .gv-svg .edge.hl { --e: var(--gv-accent); --e-sw: 2.4px; }
+.gv-svg .edge.call { --e: var(--gv-accent); --e-ink: var(--gv-accent); }
+.gv-svg .edge.indirect { --e: var(--gv-indirect); --e-ink: var(--gv-indirect); }
+.gv-svg .edge.indirect path:not(.gv-hit) { stroke-dasharray: 9 3 2 3; }
+.gv-svg .edge.virtual { --e: var(--gv-accent); --e-ink: var(--gv-accent); --e-sw: 2.2px; }
+.gv-svg .edge.virtual path:not(.gv-hit) { stroke-dasharray: .1 4.5; stroke-linecap: round; }
+.gv-svg .edge.cha { --e: var(--gv-cha); --e-ink: var(--gv-cha); --e-sw: 1.8px; }
+.gv-svg .edge.xtu { --e: var(--gv-xtu); --e-ink: var(--gv-xtu); --e-sw: 2.2px; }
 
 /* hover / focus / pin: figure.is-hl dims all but .gv-focus (the node or edge) and .gv-rel (its neighbours) */
 .gv-svg .node, .gv-svg .edge { transition: opacity .12s ease; }

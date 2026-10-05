@@ -1272,7 +1272,7 @@ CHECKER=debug.DumpCallGraph scripts/dumpcfg.sh manifests/p01_basic.cpp
   Function: g calls:
 ```
 
-`< root >` is a synthetic node that calls every function that nobody else calls. `debug.ViewCallGraph` draws it, and the same `TMPDIR` / empty `PATH` trick captures the DOT file:
+`< root >` is a synthetic node with an edge to **every** function in the graph: `g` is listed under it although `f` calls it too, and a function whose *only* caller is `< root >` is one that nobody in this translation unit calls ([Section 8.1](part_8_call_graphs.md) reads the dump in detail). `debug.ViewCallGraph` draws it, and the same `TMPDIR` / empty `PATH` trick captures the DOT file:
 
 ```bash
 mkdir -p out/dot-cg && env TMPDIR="$PWD/out/dot-cg" PATH=/var/empty \

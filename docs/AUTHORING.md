@@ -1,4 +1,4 @@
-# Authoring Guide — adding Parts 3–7
+# Authoring Guide — adding Parts 3–8
 
 How to add tools, samples and documentation to the lab without breaking what is already there. Parts 1 and 2 are the reference implementation: copy their structure.
 
@@ -6,7 +6,7 @@ Read this first, then read `docs/part_2_building_cfgs.md` (for tone and depth) a
 
 ## 1. Fixed names
 
-Everything below is fixed so the parallel authors of Parts 3–7 do not collide.
+Everything below is fixed so the parallel authors of Parts 3–8 do not collide.
 
 | Part | File (in `docs/`) | Title (used in nav links) | Tool prefix | Manifest prefix |
 |------|-------------------|---------------------------|-------------|-----------------|
@@ -17,6 +17,7 @@ Everything below is fixed so the parallel authors of Parts 3–7 do not collide.
 | 5 | `part_5_classic_analyses.md` | Classic CFG Analyses | `tools/p05_*/` | `manifests/p05_*` |
 | 6 | `part_6_dataflow_framework.md` | The FlowSensitive Dataflow Framework | `tools/p06_*/` | `manifests/p06_*` |
 | 7 | `part_7_capstone.md` | Capstone & Engineering | `tools/p07_*/` | `manifests/p07_*` |
+| 8 | `part_8_call_graphs.md` | Call Graphs | `tools/p08_*/` | `manifests/p08_*` |
 
 Parts 3–7 already exist as **stubs** with their section lists (taken from the approved outline). Replace the stub's body; keep the file name and the first line. You may rename or re-order sections only if you update the same titles in `docs/PROGRESS.md` and the section list in `docs/README.md` in the same change (`scripts/check_links.py` will tell you if they disagree).
 
@@ -208,7 +209,7 @@ Explanation, a `dot` diagram, a table of this part's tools.
 [← Part N-1 — Title](part_N-1_slug.md) | [Part N+1 — Title →](part_N+1_slug.md)
 ```
 
-Navigation links appear at the top (under the title) and at the bottom (after `---`). Part 1's previous link points to `README.md`; Part 7's next link points to `README.md` (the stubs already have the right forms). A part that ends the lab ends with `[README](README.md)`.
+Navigation links appear at the top (under the title) and at the bottom (after `---`). Part 1's previous link points to `README.md`; Part 8's next link points to `README.md` (the stubs already have the right forms). A part that ends the lab ends with `[README](README.md)`.
 
 ### The `text expected` convention (checked by `scripts/doccheck.py`)
 
@@ -245,11 +246,11 @@ digraph cfg_sign {
 
 | Element | `class=` values (space-separated, e.g. `class="cond hl"`) |
 |---------|-----------------------------------------------------------|
-| node | `entry`, `exit`, `block` (default, may be omitted), `cond` (block that ends in a branch), `note` (side annotation), `api` (a Clang class / function / tool), `data` (a value, state or artifact), `hl` (emphasis), `dim` (de-emphasized or unreachable) |
-| edge | `t` (true branch), `f` (false branch), `back` (loop back edge), `eh` (exception edge), `weak` (annotation link), `hl` (emphasis) |
-| cluster | `subgraph cluster_x { label="..."; }`, optionally `class="group"` |
+| node | `entry`, `exit`, `block` (default, may be omitted), `cond` (block that ends in a branch), `note` (side annotation), `api` (a Clang class / function / tool), `data` (a value, state or artifact), `hl` (emphasis), `dim` (de-emphasized or unreachable); call graphs: `root` (the synthetic `< root >`), `recursive` (a member of a cyclic SCC), `sink` (a `[[noreturn]]` function, or the chosen sink), `external` (declared here, defined elsewhere or nowhere) |
+| edge | `t` (true branch), `f` (false branch), `back` (loop back edge), `eh` (exception edge), `weak` (annotation link), `hl` (emphasis); call graphs: `call` (a call from a CFG element or function to its callee), `indirect` (a call with no edge in the graph, or an edge added for a function pointer), `virtual` (the static edge of a virtual call), `cha` (an edge added by class-hierarchy analysis), `xtu` (an edge that exists only after merging translation units) |
+| cluster | `subgraph cluster_x { label="..."; }`, optionally `class="group"`; call graphs: `scc` (a strongly connected component), `tu` (one translation unit) |
 
-Color is never the only carrier: label branch edges `T` / `F`, and `back`, `eh` and `weak` also differ by line style.
+Color is never the only carrier: label branch edges `T` / `F`, and `back`, `eh`, `weak`, `indirect` and `virtual` edges, `external` nodes and `scc` clusters also differ by line style.
 
 Text outputs that are graphs need no markup: every `text expected` block that `scripts/outviz` can draw (a `debug.DumpCFG` dump, `cfgshape.sh` lines, dominator trees, DOT text, the Part 2-7 tool formats) becomes a figure with **Graph** and **Output** tabs, drawn from the `bash` block directly before it; the recorded text stays the source of truth and `doccheck.py` is unaffected. A tool whose output is a graph gets its parser in `scripts/outviz/` (the `PARSERS` list; see `outviz/__init__.py`), with tests next to it.
 

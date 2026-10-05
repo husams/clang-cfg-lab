@@ -76,3 +76,15 @@ Mark a section `[x]` when you have finished it. Titles here must match the `## S
 - [ ] 7.6 — Packaging: clang-tidy-style check, plugin, comparison with the Static Analyzer
 - [ ] 7.7 — Performance and persistence
 - [ ] 7.8 — Checkpoint
+
+## Part 8 — Call Graphs
+- [ ] 8.1 — What a call graph is: `debug.DumpCallGraph`, the dump order and `< root >`
+- [ ] 8.2 — Building a `CallGraph` in C++: nodes, `CallRecord`, names and DOT/JSON export
+- [ ] 8.3 — What gets in and what stays out: `includeInGraph`, templates, implicit code, lambdas, blocks, Objective-C
+- [ ] 8.4 — Traversals through `GraphTraits`: reachability, recursion and callers-of
+- [ ] 8.5 — Orders: post-order, reverse post-order and the Static Analyzer's `ipa` modes
+- [ ] 8.6 — Bottom-up summaries over SCCs: a transitive `noreturn` analysis with a fixed point
+- [ ] 8.7 — Call sites in the CFG: `AnyCall`, callees per block and an interprocedural walk
+- [ ] 8.8 — Resolving indirect and virtual calls: function pointers, devirtualisation and CHA
+- [ ] 8.9 — Capstone: a cross-TU recursion and sink checker merged by USR
+- [ ] 8.10 — Checkpoint

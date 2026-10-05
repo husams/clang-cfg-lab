@@ -1,6 +1,6 @@
 # Clang CFG Lab — Agent Guide
 
-A hands-on lab on **Clang's control-flow graph APIs** (`clang/Analysis/CFG.h`), the classic analyses built on it, and the FlowSensitive dataflow framework (`clang::dataflow`), from `clang --analyze` dumps up to a flow-sensitive checker. It is the sibling of `libtooling-lab/` (AST-level LibTooling) and assumes only a little of it.
+A hands-on lab on **Clang's control-flow graph APIs** (`clang/Analysis/CFG.h`), the classic analyses built on it, the FlowSensitive dataflow framework (`clang::dataflow`) and the call graph (`clang/Analysis/CallGraph.h`), from `clang --analyze` dumps up to a flow-sensitive checker and a cross-TU call-graph checker. It is the sibling of `libtooling-lab/` (AST-level LibTooling) and assumes only a little of it.
 
 The lab runs **entirely locally on macOS** against Homebrew LLVM 22.1.8. No VM, no cluster.
 
@@ -45,11 +45,13 @@ clang-cfg-lab/
 │   ├── part_4_graph_algorithms.md       ← Part 4
 │   ├── part_5_classic_analyses.md       ← Part 5
 │   ├── part_6_dataflow_framework.md     ← Part 6
-│   └── part_7_capstone.md               ← Part 7
-├── manifests/                 ← sample inputs: pNN_<name>.cpp / .c / .m (p01_*, p02_* … p07_*)
+│   ├── part_7_capstone.md               ← Part 7
+│   └── part_8_call_graphs.md            ← Part 8
+├── manifests/                 ← sample inputs: pNN_<name>.cpp / .c / .m (p01_*, p02_* … p08_*)
 ├── tools/                     ← ONE CMake project; each tools/pNN_<name>/ is an executable
 │   ├── CMakeLists.txt         ← add_cfg_tool(); auto-discovers tools/pNN_*/
 │   ├── common/cfglab.h        ← shared helpers (platform flags, presets, names, per-function driver)
+│   ├── common/cglab.h         ← Part 8 helpers (call-graph snapshot, naming, DOT/JSON, per-TU driver)
 │   ├── _template/main.cpp     ← copy to start a new tool
 │   └── pNN_<name>/            ← one directory per tool (p07_plugin / p07_tidy carry their own CMakeLists):
 │       p00: smoke
@@ -59,6 +61,7 @@ clang-cfg-lab/
 │       p05: calledonce, consumed, deadstores, lifetime, liveness, pipeline, tautology, tsa, uninit, unreachable
 │       p06: adorned, constprop, contract, env, flowcond, log, optional, sat, taint, widen
 │       p07: combined, ctx, movecheck, persist, plugin, tidy, tu, verify
+│       p08: check, nodes, resolve, sites, summary, walk, xtu
 ├── scripts/
 │   ├── build.sh               ← build all tools or named ones (scripts/build.sh --clean, --list)
 │   ├── run.sh                 ← run a tool; resolves bare manifest names

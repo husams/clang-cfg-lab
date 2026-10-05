@@ -1,6 +1,6 @@
 # Clang CFG Lab — Hands-on Control-Flow Graphs in Clang 22
 
-A hands-on lab for learning **Clang's source-level CFG (`clang/Analysis/CFG.h`), the classic analyses built on it, and the FlowSensitive dataflow framework** by running real tools against real code. It goes from reading `clang --analyze -Xclang -analyzer-checker=debug.DumpCFG` output to writing, testing and packaging a flow-sensitive checker.
+A hands-on lab for learning **Clang's source-level CFG (`clang/Analysis/CFG.h`), the classic analyses built on it, and the FlowSensitive dataflow framework** by running real tools against real code. It goes from reading `clang --analyze -Xclang -analyzer-checker=debug.DumpCFG` output to writing, testing and packaging a flow-sensitive checker. Part 8 then adds the inter-procedural dimension: `clang::CallGraph`, its traversals and summaries, and a cross-translation-unit checker.
 
 Every API in the lab was checked against the installed LLVM 22.1.8 headers. Where older tutorials are wrong for Clang 22 (`ControlFlowContext.h` is now `AdornedCFG.h`, `CFGStmtMap::Build` is a constructor, `Environment` has no `SkipPast`, there is no `RecordValue`), the lab says so where it matters.
 
@@ -27,6 +27,7 @@ Every API in the lab was checked against the installed LLVM 22.1.8 headers. Wher
 | 5 | [Classic CFG Analyses](part_5_classic_analyses.md) | liveness · dead stores · uninitialised values · unreachable code · thread safety / consumed / called-once · lifetime safety · `CFGCallback` · how Sema composes them |
 | 6 | [The FlowSensitive Dataflow Framework](part_6_dataflow_framework.md) | lattices · `DataflowAnalysis` · `AdornedCFG` · widening · `Environment` · flow conditions and SAT · match switches · built-in models · debugging |
 | 7 | [Capstone & Engineering](part_7_capstone.md) | design and implement a checker · whole-TU driver and budgets · test harness · context sensitivity · packaging · performance |
+| 8 | [Call Graphs](part_8_call_graphs.md) | `clang::CallGraph` · what it records and omits · `GraphTraits` traversals and SCCs · analyzer order · bottom-up summaries · call sites in the CFG · indirect and virtual call resolution · cross-TU merge by USR |
 
 ### Section lists
 
@@ -112,6 +113,19 @@ Every API in the lab was checked against the installed LLVM 22.1.8 headers. Wher
 - 7.7 Performance and persistence
 - 7.8 Checkpoint
 
+**Part 8 — Call Graphs**
+
+- 8.1 What a call graph is: `debug.DumpCallGraph`, the dump order and `< root >`
+- 8.2 Building a `CallGraph` in C++: nodes, `CallRecord`, names and DOT/JSON export
+- 8.3 What gets in and what stays out: `includeInGraph`, templates, implicit code, lambdas, blocks, Objective-C
+- 8.4 Traversals through `GraphTraits`: reachability, recursion and callers-of
+- 8.5 Orders: post-order, reverse post-order and the Static Analyzer's `ipa` modes
+- 8.6 Bottom-up summaries over SCCs: a transitive `noreturn` analysis with a fixed point
+- 8.7 Call sites in the CFG: `AnyCall`, callees per block and an interprocedural walk
+- 8.8 Resolving indirect and virtual calls: function pointers, devirtualisation and CHA
+- 8.9 Capstone: a cross-TU recursion and sink checker merged by USR
+- 8.10 Checkpoint
+
 ## Prerequisites
 
 - Comfortable reading C++17 and basic Clang AST ideas (`FunctionDecl`, `Stmt`, `Expr`). The sibling [libtooling-lab](../../libtooling-lab/docs/README.md) is the long version of that background; Part 2 here is self-contained for the little you need.
@@ -128,11 +142,12 @@ clang-cfg-lab/
 │   ├── README.md            ← this file
 │   ├── PROGRESS.md          ← section-by-section checklist
 │   ├── AUTHORING.md         ← how to add tools, samples and sections
-│   └── part_N_<slug>.md     ← the seven parts
+│   └── part_N_<slug>.md     ← the eight parts
 ├── manifests/               ← sample C/C++ inputs: pNN_<name>.cpp / .c
 ├── tools/                   ← one CMake project, one directory per tool
 │   ├── CMakeLists.txt       ← add_cfg_tool(), auto-discovers tools/pNN_*/
 │   ├── common/cfglab.h      ← shared helpers (platform flags, presets, names)
+│   ├── common/cglab.h       ← Part 8 helpers (call-graph snapshot, naming, DOT/JSON)
 │   └── pNN_<name>/main.cpp
 ├── scripts/                 ← build.sh, run.sh, dumpcfg.sh, cfgshape.sh, viewcfg.sh,
 │                              optdiff.sh, flags.sh, doccheck.py, check_links.py, check.sh,
