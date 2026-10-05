@@ -17,6 +17,11 @@
 //   * cglab::libraryDot()     -- llvm::WriteGraph output with the Node0x... ids replaced
 //   * cglab::runPerTU()       -- main() boilerplate: one callback per translation unit
 //   * CGLAB_DEFINE_COMMON_FLAGS(Cat) -- --sort --emit --with-root --all-files
+//   * added for Sections 8.4-8.9 (p08_build, p08_anycall, p08_mine, p08_nodes --view), at the end
+//     of the file: ContextVisitor (a visitor that knows its enclosing function), runPerAST (main()
+//     boilerplate that builds no graph), anyCallKindName, visitorFlagsLine, typeName,
+//     displayName, normalizeDot (the Node0x -> N<id> rewrite libraryDot uses, for any
+//     WriteGraph / ViewGraph text)
 //
 // Naming rule (printed name == node identity inside one TU)
 //   <root>                      the virtual root (clang prints "< root >")
@@ -40,6 +45,7 @@
 
 #include "cfglab.h"
 
+#include "clang/Analysis/AnyCall.h"
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Index/USRGeneration.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1055,15 +1061,11 @@ inline void libraryDump(llvm::raw_ostream &OS, const CallGraph &CG, bool DropRoo
   }
 }
 
-// llvm::WriteGraph over the call graph (through LibGraph, which supplies CallGraph.cpp's
-// labels), with the Node0x<pointer> ids replaced by N<id> (ids in printed-name order, <root> =
-// N0) and the node blocks sorted, so the text is the same on every run. Build G with
-// MainFileOnly=false: WriteGraph prints every node.
-inline void libraryDot(llvm::raw_ostream &OS, const Graph &G) {
-  std::string Raw;
-  llvm::raw_string_ostream RS(Raw);
-  llvm::WriteGraph(RS, LibGraph{&G.callGraph()}, /*ShortNames=*/false, "CallGraph");
-  RS.flush();
+// Rewrite the text of an llvm::WriteGraph / llvm::ViewGraph of the call graph so that it is the
+// same on every run: the Node0x<pointer> ids become N<id> (ids in printed-name order, <root> =
+// N0) and the node blocks are sorted. G must have been built with MainFileOnly=false (the
+// graph writers print every node, so the ids must cover every node).
+inline void normalizeDot(llvm::raw_ostream &OS, const std::string &Raw, const Graph &G) {
   std::map<std::string, std::string> Rename;
   for (const Node &N : G.nodes()) {
     std::string P;
@@ -1100,6 +1102,17 @@ inline void libraryDot(llvm::raw_ostream &OS, const Graph &G) {
   for (const std::string &L : Head) OS << L << "\n";
   for (auto &[Id, B] : Blocks) OS << B;
   for (const std::string &L : Tail) OS << L << "\n";
+}
+
+// llvm::WriteGraph over the call graph (through LibGraph, which supplies CallGraph.cpp's
+// labels), normalised by normalizeDot. Build G with MainFileOnly=false: WriteGraph prints
+// every node.
+inline void libraryDot(llvm::raw_ostream &OS, const Graph &G) {
+  std::string Raw;
+  llvm::raw_string_ostream RS(Raw);
+  llvm::WriteGraph(RS, LibGraph{&G.callGraph()}, /*ShortNames=*/false, "CallGraph");
+  RS.flush();
+  normalizeDot(OS, Raw, G);
 }
 
 // --------------------------------------------------------------------------
@@ -1193,5 +1206,132 @@ inline int runPerTU(int argc, const char **argv, llvm::cl::OptionCategory &Cat, 
     O.MainFileOnly = !CgAllFilesFlag;                                                        \
     return O;                                                                                \
   }
+
+// --------------------------------------------------------------------------
+// Additions for p08_build, p08_anycall and p08_mine (Sections 8.4, 8.7, 8.8). The helpers below
+// are new; above this line only libraryDot changed, and only in that its text rewriting moved
+// into normalizeDot (same output, checked byte for byte against the previous build).
+// --------------------------------------------------------------------------
+
+namespace cglab {
+
+inline const char *anyCallKindName(AnyCall::Kind K) {
+  switch (K) {
+  case AnyCall::Function: return "Function";
+  case AnyCall::ObjCMethod: return "ObjCMethod";
+  case AnyCall::Block: return "Block";
+  case AnyCall::Destructor: return "Destructor";
+  case AnyCall::Constructor: return "Constructor";
+  case AnyCall::InheritedConstructor: return "InheritedConstructor";
+  case AnyCall::Allocator: return "Allocator";
+  case AnyCall::Deallocator: return "Deallocator";
+  }
+  return "?";
+}
+
+// The four data members of DynamicRecursiveASTVisitor that change what a CallGraph visits, as
+// one line:  flags implicit=1 instantiations=1 typelocs=0 lambda-body=1
+inline std::string visitorFlagsLine(const DynamicRecursiveASTVisitor &V) {
+  return std::string("flags implicit=") + (V.ShouldVisitImplicitCode ? "1" : "0") +
+         " instantiations=" + (V.ShouldVisitTemplateInstantiations ? "1" : "0") +
+         " typelocs=" + (V.ShouldWalkTypesOfTypeLocs ? "1" : "0") +
+         " lambda-body=" + (V.ShouldVisitLambdaBody ? "1" : "0");
+}
+
+// A printed type ("int (*)(int)", "void *").
+inline std::string typeName(QualType T, const ASTContext &Ctx) {
+  return T.getAsString(Ctx.getPrintingPolicy());
+}
+
+// The name the tools print for any declaration: the graph's unique node name when the graph
+// has a node for it, the naming rule's base name otherwise (a field, a declaration the graph
+// does not keep, an implicit operator delete ...).
+inline std::string displayName(const Graph &G, const Decl *D) {
+  if (!D) return "?";
+  if (std::optional<unsigned> Id = G.find(D)) return G.node(*Id).Name;
+  return baseName(D);
+}
+
+// A DynamicRecursiveASTVisitor that knows which declaration it is inside: the innermost
+// function, method, Objective-C method, block, field (while visiting its in-class initialiser)
+// and, with VarContexts, file-scope or static-member variable (while visiting its initialiser).
+// Derive, set the Should* flags in the constructor, override Visit* and read cur(). The
+// context is pushed in TraverseDecl, which the visitor calls for every declaration it reaches,
+// a lambda's call operator and a block included.
+struct ContextVisitor : DynamicRecursiveASTVisitor {
+  bool VarContexts = false;
+
+  const Decl *cur() const { return Stack.empty() ? nullptr : Stack.back(); }
+
+  bool isContext(const Decl *D) const {
+    if (isa<FunctionDecl>(D) || isa<ObjCMethodDecl>(D) || isa<BlockDecl>(D)) return true;
+    if (const auto *FD = dyn_cast<FieldDecl>(D)) return FD->hasInClassInitializer();
+    if (const auto *VD = dyn_cast<VarDecl>(D))
+      return VarContexts && VD->hasInit() && (VD->isFileVarDecl() || VD->isStaticDataMember());
+    return false;
+  }
+
+  // Inside a template pattern or a member of a class template pattern: the expressions there
+  // are not resolved yet.
+  static bool inDependentContext(const Decl *D) {
+    if (isa<DeclContext>(D)) return cast<DeclContext>(D)->isDependentContext();
+    return D->getDeclContext()->isDependentContext();
+  }
+
+  bool TraverseDecl(Decl *D) override {
+    if (!D || !isContext(D)) return DynamicRecursiveASTVisitor::TraverseDecl(D);
+    Stack.push_back(D);
+    bool R = DynamicRecursiveASTVisitor::TraverseDecl(D);
+    Stack.pop_back();
+    return R;
+  }
+
+private:
+  std::vector<const Decl *> Stack;
+};
+
+// Like runPerTU, but the callback gets only the ASTContext and builds the CallGraph itself:
+// a tool that sets the visitor flags before addToCallGraph, or adds functions one at a time,
+// cannot use runPerTU (which builds the graph with the library's defaults first).
+using AstCallback = std::function<void(ASTContext &)>;
+
+namespace detail {
+struct AstConsumer : ASTConsumer {
+  const AstCallback &CB;
+  explicit AstConsumer(const AstCallback &F) : CB(F) {}
+  void HandleTranslationUnit(ASTContext &Ctx) override { CB(Ctx); }
+};
+struct AstActionFactory : FrontendActionFactory {
+  const AstCallback &CB;
+  explicit AstActionFactory(const AstCallback &F) : CB(F) {}
+  std::unique_ptr<FrontendAction> create() override {
+    struct Act : ASTFrontendAction {
+      const AstCallback &CB;
+      explicit Act(const AstCallback &F) : CB(F) {}
+      std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &, StringRef) override {
+        return std::make_unique<AstConsumer>(CB);
+      }
+    };
+    return std::make_unique<Act>(CB);
+  }
+};
+} // namespace detail
+
+inline int runPerAST(int argc, const char **argv, llvm::cl::OptionCategory &Cat, AstCallback CB) {
+  std::vector<std::string> Storage;
+  auto Args = cfglab::withDefaultCompileFlags(argc, argv, Storage);
+  int N = static_cast<int>(Args.size());
+  auto Options = CommonOptionsParser::create(N, Args.data(), Cat);
+  if (!Options) {
+    llvm::errs() << llvm::toString(Options.takeError());
+    return 1;
+  }
+  ClangTool Tool(Options->getCompilations(), Options->getSourcePathList());
+  cfglab::addPlatformFlags(Tool);
+  detail::AstActionFactory F(CB);
+  return Tool.run(&F);
+}
+
+} // namespace cglab
 
 #endif // CGLAB_H
