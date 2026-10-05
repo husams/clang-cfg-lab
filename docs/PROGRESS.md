@@ -77,14 +77,47 @@ Mark a section `[x]` when you have finished it. Titles here must match the `## S
 - [ ] 7.7 — Performance and persistence
 - [ ] 7.8 — Checkpoint
 
-## Part 8 — Call Graphs
+## Part 8 — Call Graph Fundamentals
 - [ ] 8.1 — What a call graph is: `debug.DumpCallGraph`, the dump order and `< root >`
-- [ ] 8.2 — Building a `CallGraph` in C++: nodes, `CallRecord`, names and DOT/JSON export
-- [ ] 8.3 — What gets in and what stays out: `includeInGraph`, templates, implicit code, lambdas, blocks, Objective-C
-- [ ] 8.4 — Traversals through `GraphTraits`: reachability, recursion and callers-of
-- [ ] 8.5 — Orders: post-order, reverse post-order and the Static Analyzer's `ipa` modes
-- [ ] 8.6 — Bottom-up summaries over SCCs: a transitive `noreturn` analysis with a fixed point
-- [ ] 8.7 — Call sites in the CFG: `AnyCall`, callees per block and an interprocedural walk
-- [ ] 8.8 — Resolving indirect and virtual calls: function pointers, devirtualisation and CHA
-- [ ] 8.9 — Capstone: a cross-TU recursion and sink checker merged by USR
+- [ ] 8.2 — The container: `CallGraph`, `CallGraphNode`, `CallRecord` and canonical declarations
+- [ ] 8.3 — Names and identity: `printQualifiedName`, template arguments, lambdas, blocks, selectors and the USR
+- [ ] 8.4 — The builder: a `DynamicRecursiveASTVisitor` with two doors, four flags and an incremental `addToCallGraph`
+- [ ] 8.5 — What `CGBuilder` records: calls, constructors, `new`, initialisers, default arguments, lambdas and blocks
+- [ ] 8.6 — What stays out: function pointers, block variables, `delete`, implicit destructors, virtual targets and Objective-C's rule
+- [ ] 8.7 — `AnyCall`: one interface for every call-like expression and declaration
+- [ ] 8.8 — Your own call graph: a visitor that records what `CGBuilder` skips, diffed against the library's
+- [ ] 8.9 — Exports: the lab's DOT and JSON, the library's `WriteGraph`, `print`, `dump` and `viewGraph`
 - [ ] 8.10 — Checkpoint
+
+## Part 9 — Call Graph Algorithms
+- [ ] 9.1 — `GraphTraits<CallGraph*>` and the generic traversals: `depth_first`, `breadth_first`, `post_order` and `ReversePostOrderTraversal`
+- [ ] 9.2 — Strongly connected components: `scc_iterator`, recursion and `clang-tidy`'s `misc-no-recursion`
+- [ ] 9.3 — Reachability, roots and dead functions
+- [ ] 9.4 — Callers: the reverse graph, the missing `Inverse<CallGraph*>` and transitive callers
+- [ ] 9.5 — Metrics: fan-in, fan-out, call sites, height and the SCC condensation
+- [ ] 9.6 — Witness paths: shortest call chains and `pathfindSomeCycle`
+- [ ] 9.7 — The Static Analyzer's order: `HandleDeclsCallGraph`, `-analyzer-display-progress`, `-analyzer-note-analysis-entry-points` and `debug.Stats`
+- [ ] 9.8 — Inlining configuration: `mode`, `ipa`, `max-inlinable-size`, `ipa-always-inline-size`, `-analyzer-inline-max-stack-depth`, `-analyzer-inlining-mode` and the statistics switches
+- [ ] 9.9 — Checkpoint
+
+## Part 10 — Interprocedural Analysis
+- [ ] 10.1 — Call sites in the CFG: `AnyCall` on elements, the `missing:` classes and the options that decide what the CFG has
+- [ ] 10.2 — An interprocedural walk: descending into resolved callees
+- [ ] 10.3 — Bottom-up summaries over SCCs: a transitive `noreturn` analysis with a fixed point
+- [ ] 10.4 — Widening and the limits of a summary: `depth`, `inf` and call-site context
+- [ ] 10.5 — Context sensitivity: k-limited call strings
+- [ ] 10.6 — How the Static Analyzer goes interprocedural: `CallEvent` kinds, inlining versus conservative evaluation, `RuntimeDefinition` and the exploded graph
+- [ ] 10.7 — `BodyFarm`: synthesised bodies for `dispatch_once`, `std::call_once` and friends
+- [ ] 10.8 — Context sensitivity in the FlowSensitive framework: `ContextSensitiveOptions`, `pushCall`, `popCall`, `canDescend`
+- [ ] 10.9 — Checkpoint
+
+## Part 11 — Indirect Calls, Cross-TU and Scale
+- [ ] 11.1 — Function pointers: address-taken sets, signature matching and the recursion they hide
+- [ ] 11.2 — Virtual calls: `getDevirtualizedMethod`, class-hierarchy analysis and rapid type analysis
+- [ ] 11.3 — Soundness and precision: what each rule trades, and the analyzer's `ipa=dynamic` / `dynamic-bifurcate`
+- [ ] 11.4 — `clang::index` as a second source of call edges: `SymbolRole::Call`, `RelationCalledBy` and `Dyn`
+- [ ] 11.5 — Cross-TU merge by USR
+- [ ] 11.6 — Clang's real CTU: `clang-extdef-mapping`, `-emit-ast`, `ctu-dir`, on-demand parsing and `-analyzer-output=text`
+- [ ] 11.7 — Capstone: a cross-TU recursion and sink checker
+- [ ] 11.8 — Scale: a 3000-function translation unit, costs and persistence
+- [ ] 11.9 — Checkpoint

@@ -1540,6 +1540,14 @@ class WalkTrack(CgCase):
         self.assertEqual(edge_classes(dot, "fact", "fact"), ["back"])
         self.assertEqual(sorted(classes(dot, "fact")), ["hl", "recursive"])  # the end of the witness, and recursive
 
+    def test_a_tool_s_error_line_and_an_exit_echo_are_not_graph_content(self):
+        text = ("path main -> guarded -> die -> fail (3 calls)\npath safe -> fail: none\n"
+                "p09_walk: --path needs two different functions; --cycle=main is the question for recursion\nexit=2\n")
+        dot = self.assertDrawn(to_dot(text, self.SINK + " --path=main,fail\n" + self.SINK + " --path=main,main; echo \"exit=$?\""))
+        self.assertEqual(edge_classes(dot, "die", "fail"), ["hl"])
+        self.assertIsNone(to_dot("p09_walk: --path needs two different functions\nexit=2\n", self.SINK + " --path=main,main"))
+        self.assertIsNone(to_dot(PATH + "t.cpp:1:1: warning: unused\n", self.SINK + " --path=main,fail"))  # a clang warning still is a line this format does not know
+
     def test_no_path_and_no_cycle_have_nothing_to_draw(self):
         self.assertIsNone(to_dot(PATH_NONE, self.SINK + " --path=fail,main"))
         self.assertIsNone(to_dot(CYCLE_NONE, self.SINK + " --cycle=safe"))
@@ -1706,6 +1714,20 @@ class Tidy(CgCase):
         self.assertEqual(edge_classes(dot, "pong", "pang"), ["back"])
         self.assertNotIn('"c"', dot)  # a warning with no chain of its own draws nothing
         self.assertEqual(len(edges(dot)), 8)
+
+    def test_a_chain_a_pipeline_printed_is_a_cycle_with_its_tags(self):
+        pipe = "clang-tidy -checks='-*,misc-no-recursion' out/ex_cycle.cpp -- -std=c++17 2>/dev/null | sed -nE ... | awk ...\nbuild/bin/p09_walk out/ex_cycle.cpp --cycle=z | sed 's/^cycle /lab:   /'"
+        dot = self.assertDrawn(to_dot("tidy:  z -> x -> y -> w -> z\nlab:   z -> x -> z\n", pipe))
+        self.assertEqual(edge_label(dot, "z", "x"), "tidy, lab")  # both chains have it
+        self.assertEqual(edge_label(dot, "x", "y"), "tidy")
+        self.assertEqual(edge_label(dot, "x", "z"), "lab")  # the shorter cycle the lab finds
+        self.assertEqual(edge_classes(dot, "w", "z"), ["back"])
+        for name in "zxyw":
+            self.assertEqual(classes(dot, name), ["recursive"])
+        dot = self.assertDrawn(to_dot("tidy:  pang -> ping -> pong -> pang\nlab:   pang -> ping -> pong -> pang\n", pipe))
+        self.assertEqual({edge_label(dot, a, b) for a, b, _ in edges(dot)}, {"tidy, lab"})  # the two agree
+        self.assertEqual(edge_classes(dot, "pong", "pang"), ["back"])
+        self.assertIsNone(to_dot("tidy:  fact -> fact\n", pipe))  # one node
 
     def test_no_frame_no_figure(self):
         warnings = "".join(ln + "\n" for ln in TIDY_FILTERED.splitlines() if "warning" in ln)

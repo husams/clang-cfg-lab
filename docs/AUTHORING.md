@@ -1,4 +1,4 @@
-# Authoring Guide — adding Parts 3–8
+# Authoring Guide — adding Parts 3–11
 
 How to add tools, samples and documentation to the lab without breaking what is already there. Parts 1 and 2 are the reference implementation: copy their structure.
 
@@ -6,7 +6,7 @@ Read this first, then read `docs/part_2_building_cfgs.md` (for tone and depth) a
 
 ## 1. Fixed names
 
-Everything below is fixed so the parallel authors of Parts 3–8 do not collide.
+Everything below is fixed so the parallel authors of Parts 3–11 do not collide.
 
 | Part | File (in `docs/`) | Title (used in nav links) | Tool prefix | Manifest prefix |
 |------|-------------------|---------------------------|-------------|-----------------|
@@ -17,9 +17,12 @@ Everything below is fixed so the parallel authors of Parts 3–8 do not collide.
 | 5 | `part_5_classic_analyses.md` | Classic CFG Analyses | `tools/p05_*/` | `manifests/p05_*` |
 | 6 | `part_6_dataflow_framework.md` | The FlowSensitive Dataflow Framework | `tools/p06_*/` | `manifests/p06_*` |
 | 7 | `part_7_capstone.md` | Capstone & Engineering | `tools/p07_*/` | `manifests/p07_*` |
-| 8 | `part_8_call_graphs.md` | Call Graphs | `tools/p08_*/` | `manifests/p08_*` |
+| 8 | `part_8_call_graphs.md` | Call Graph Fundamentals | `tools/p08_*/` | `manifests/p08_*` |
+| 9 | `part_9_call_graph_algorithms.md` | Call Graph Algorithms | `tools/p09_*/` | `manifests/p09_*` |
+| 10 | `part_10_interprocedural_analysis.md` | Interprocedural Analysis | `tools/p10_*/` | `manifests/p10_*` |
+| 11 | `part_11_indirect_xtu_scale.md` | Indirect Calls, Cross-TU and Scale | `tools/p11_*/` | `manifests/p11_*` |
 
-Parts 3–7 already exist as **stubs** with their section lists (taken from the approved outline). Replace the stub's body; keep the file name and the first line. You may rename or re-order sections only if you update the same titles in `docs/PROGRESS.md` and the section list in `docs/README.md` in the same change (`scripts/check_links.py` will tell you if they disagree).
+Parts 3–11 started as **stubs** with their section lists (taken from the approved outlines). Replace the stub's body; keep the file name and the first line. Parts 8–11 are the call-graph track: each tool and manifest carries the prefix of the part that introduces it (`p10_analyzer.cpp` is used by Part 9 as well, because Part 10 introduces its `clang_analyzer_eval` lines), so `scripts/build.sh --list | grep '^p10_'` lists a part's tools. You may rename or re-order sections only if you update the same titles in `docs/PROGRESS.md` and the section list in `docs/README.md` in the same change (`scripts/check_links.py` will tell you if they disagree).
 
 Write **5–9 content sections plus a `Checkpoint`** per part (the stubs show the plan; the skill limit is 10 sections).
 
@@ -117,6 +120,8 @@ Header-only; included as `"cfglab.h"`; namespace `cfglab` (it `using namespace c
 | `blockName(B)` | `"B3"`, or `"null"` for a null pointer |
 | `lineOf(SM, Loc)` | spelling line number |
 
+**Call-graph tools** (Parts 8–11) include `tools/common/cglab.h` instead, which includes `cfglab.h`. It is the call-graph helper shared by all four parts: `runPerTU` (one callback per translation unit, with the `CallGraph` built) and `runPerAST` (the same, but the tool builds the graph itself, so that visitor flags can be set first; Section 8.4), `CGLAB_DEFINE_COMMON_FLAGS` (`--sort`, `--emit`, `--with-root`, `--all-files`), the `Graph` snapshot (unique names, sorted nodes and edges, no pointers in any output), the naming rule and `usrOf`, `lookupNode`, `AdjGraph` (a copy of the graph with its own `GraphTraits`, for the reverse graph), `printNodeLine` / `printEdgeLine`, `DotWriter` and `toJson` (the `--emit` formats), `libraryDump`, `libraryDot` and `normalizeDot` (the library's own exports), `ContextVisitor` (a visitor that knows its enclosing function), `anyCallKindName`, `visitorFlagsLine`, `typeName` and `displayName`. The same rule applies as for `cfglab.h`: additions are append-only, and the documented outputs of Parts 8–11 are checked by `scripts/doccheck.py`.
+
 Add new shared helpers to `cfglab.h` rather than copying them between tools, but **do not change the behaviour of an existing helper** — Parts 1–2 depend on it, and their documented output is checked by `scripts/doccheck.py`. If a helper really has to change, run `scripts/check.sh` before handing back.
 
 ## 5. Adding a sample
@@ -209,7 +214,7 @@ Explanation, a `dot` diagram, a table of this part's tools.
 [← Part N-1 — Title](part_N-1_slug.md) | [Part N+1 — Title →](part_N+1_slug.md)
 ```
 
-Navigation links appear at the top (under the title) and at the bottom (after `---`). Part 1's previous link points to `README.md`; Part 8's next link points to `README.md` (the stubs already have the right forms). A part that ends the lab ends with `[README](README.md)`.
+Navigation links appear at the top (under the title) and at the bottom (after `---`). Part 1's previous link points to `README.md`; Part 11's next link points to `README.md` (the stubs already have the right forms). A part that ends the lab ends with `[README](README.md)`.
 
 ### The `text expected` convention (checked by `scripts/doccheck.py`)
 
@@ -315,3 +320,13 @@ These cost time once; they should not cost it again.
 - `debug.ViewCFG` / `debug.ViewCallGraph` try to launch a viewer; use `scripts/viewcfg.sh` (`TMPDIR=<dir> PATH=/var/empty`) in scripts and docs.
 - `-dataflow-log` is a hidden `llvm::cl` option; it works directly in any tool that parses `llvm::cl` options through `CommonOptionsParser` (Part 6.8).
 - `brew upgrade llvm` changes the Cellar path baked into the tools: `scripts/build.sh` reconfigures on every call, so the next build picks it up.
+
+**Call graphs and the Static Analyzer (Parts 8-11)**
+
+- `CallGraph::print` is a reverse post-order from the root; `begin()`/`end()` are a pointer-keyed `DenseMap` in a different order on every run. `dump()` writes to **stderr** (like `CFG::dump()`). `< root >` has an edge to **every** node, and `size()` counts it.
+- `CallGraph::getNode(D)` looks `D` up as given; only the canonical declaration is a key. Use `cglab::lookupNode`, or `getOrInsertNode`, which canonicalises.
+- `DOTGraphTraits<const CallGraph *>` lives in `CallGraph.cpp`: `llvm::WriteGraph` over a `const CallGraph *` prints empty labels. `CallGraph::viewGraph()` is compiled where the traits are visible, so it labels correctly.
+- `CallGraph::TraverseStmt` returns `true`: bodies are walked by `CGBuilder`, not by the visitor, so `ShouldVisitLambdaBody` and `ShouldWalkTypesOfTypeLocs` change nothing, and `ShouldVisitTemplateInstantiations = false` removes edges, not nodes.
+- `-analyzer-inline-max-stack-depth` is a **cc1 flag**, not an `-analyzer-config` key: `clang -cc1 -analyze -analyzer-config inline-max-stack-depth=1` is `error: unknown analyzer-config`. Through the driver: `-Xclang -analyzer-inline-max-stack-depth -Xclang N`.
+- The **driver** silently ignores an unknown `-analyzer-config` key (`clang --analyze` passes `-analyzer-config-compatibility-mode=true` to cc1; `-Xclang -analyzer-config -Xclang bogus-key=1` exits 0 with no message). Only `clang -cc1` rejects it, so a misspelt key through `scripts/dumpcfg.sh` looks like "no effect". Check keys with `clang -cc1 -analyzer-config-help`.
+- `debug.DumpCalls` prints pointers (`lazyCompoundVal{0x...}`) and conjured symbol ids; normalise them in the command with `sed -E 's/0x[0-9a-f]+/0xADDR/g; s/conj_\$[0-9]+\{[^}]*\}/conj/g'`. `debug.Stats` and `debug.AnalysisOrder` are deterministic; `-analyzer-stats` and `-analyzer-display-progress` print times.

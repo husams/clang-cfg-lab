@@ -1,6 +1,6 @@
 # Clang CFG Lab — Agent Guide
 
-A hands-on lab on **Clang's control-flow graph APIs** (`clang/Analysis/CFG.h`), the classic analyses built on it, the FlowSensitive dataflow framework (`clang::dataflow`) and the call graph (`clang/Analysis/CallGraph.h`), from `clang --analyze` dumps up to a flow-sensitive checker and a cross-TU call-graph checker. It is the sibling of `libtooling-lab/` (AST-level LibTooling) and assumes only a little of it.
+A hands-on lab on **Clang's control-flow graph APIs** (`clang/Analysis/CFG.h`), the classic analyses built on it, the FlowSensitive dataflow framework (`clang::dataflow`) and, in four parts (8-11), the call graph (`clang/Analysis/CallGraph.h`) and the interprocedural machinery built on it (summaries, call strings, the Static Analyzer's inlining, cross-TU analysis), from `clang --analyze` dumps up to a flow-sensitive checker and a cross-TU call-graph checker. It is the sibling of `libtooling-lab/` (AST-level LibTooling) and assumes only a little of it.
 
 The lab runs **entirely locally on macOS** against Homebrew LLVM 22.1.8. No VM, no cluster.
 
@@ -46,12 +46,15 @@ clang-cfg-lab/
 │   ├── part_5_classic_analyses.md       ← Part 5
 │   ├── part_6_dataflow_framework.md     ← Part 6
 │   ├── part_7_capstone.md               ← Part 7
-│   └── part_8_call_graphs.md            ← Part 8
-├── manifests/                 ← sample inputs: pNN_<name>.cpp / .c / .m (p01_*, p02_* … p08_*)
+│   ├── part_8_call_graphs.md            ← Part 8 (call graph fundamentals)
+│   ├── part_9_call_graph_algorithms.md  ← Part 9 (orders, SCCs, reachability, callers, metrics, paths, analyzer order)
+│   ├── part_10_interprocedural_analysis.md ← Part 10 (summaries, call strings, analyzer IPA, BodyFarm)
+│   └── part_11_indirect_xtu_scale.md    ← Part 11 (pointers, virtual calls, clang::index, CTU, scale)
+├── manifests/                 ← sample inputs: pNN_<name>.cpp / .c / .m (p01_*, p02_* … p11_*)
 ├── tools/                     ← ONE CMake project; each tools/pNN_<name>/ is an executable
 │   ├── CMakeLists.txt         ← add_cfg_tool(); auto-discovers tools/pNN_*/
 │   ├── common/cfglab.h        ← shared helpers (platform flags, presets, names, per-function driver)
-│   ├── common/cglab.h         ← Part 8 helpers (call-graph snapshot, naming, DOT/JSON, per-TU driver)
+│   ├── common/cglab.h         ← call-graph helpers of Parts 8-11 (snapshot, naming, DOT/JSON, per-TU driver)
 │   ├── _template/main.cpp     ← copy to start a new tool
 │   └── pNN_<name>/            ← one directory per tool (p07_plugin / p07_tidy carry their own CMakeLists):
 │       p00: smoke
@@ -61,7 +64,10 @@ clang-cfg-lab/
 │       p05: calledonce, consumed, deadstores, lifetime, liveness, pipeline, tautology, tsa, uninit, unreachable
 │       p06: adorned, constprop, contract, env, flowcond, log, optional, sat, taint, widen
 │       p07: combined, ctx, movecheck, persist, plugin, tidy, tu, verify
-│       p08: check, nodes, resolve, sites, summary, walk, xtu
+│       p08: anycall, build, mine, nodes
+│       p09: metrics, walk
+│       p10: callstrings, farm, sites, summary
+│       p11: check, index, resolve, xtu
 ├── scripts/
 │   ├── build.sh               ← build all tools or named ones (scripts/build.sh --clean, --list)
 │   ├── run.sh                 ← run a tool; resolves bare manifest names
@@ -70,10 +76,13 @@ clang-cfg-lab/
 │   ├── viewcfg.sh             ← debug.ViewCFG → .dot files without opening a viewer
 │   ├── optdiff.sh             ← what does one BuildOptions field change for one function
 │   ├── flags.sh               ← the macOS platform flags as a string
+│   ├── ctu.sh                 ← Clang's cross-TU analysis end to end: extdef mapping, .ast files or on-demand, analysis (Part 11)
+│   ├── gen_calls.py           ← deterministic generated translation unit of N functions for the scale section (Part 11)
 │   ├── doccheck.py            ← run the doc commands and check/refresh `text expected` blocks
 │   ├── check_links.py         ← link + PROGRESS validation
 │   ├── check.sh               ← build + smoke test + doccheck + links + site
 │   ├── build_site.py          ← docs/*.md → site/index.html + site/part_N.html (dark-mode HTML)
+│   ├── outviz/                ← text outputs → graph figures for the site (cfg.py, cg.py for the call-graph tools, ...)
 │   └── check_site.py          ← every part/section anchor and internal link exists in site/
 ├── build/                     ← Ninja output; binaries in build/bin/      (git-ignored)
 ├── out/                       ← scratch output of lab commands            (git-ignored)

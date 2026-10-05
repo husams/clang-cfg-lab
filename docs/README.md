@@ -1,6 +1,6 @@
 # Clang CFG Lab — Hands-on Control-Flow Graphs in Clang 22
 
-A hands-on lab for learning **Clang's source-level CFG (`clang/Analysis/CFG.h`), the classic analyses built on it, and the FlowSensitive dataflow framework** by running real tools against real code. It goes from reading `clang --analyze -Xclang -analyzer-checker=debug.DumpCFG` output to writing, testing and packaging a flow-sensitive checker. Part 8 then adds the inter-procedural dimension: `clang::CallGraph`, its traversals and summaries, and a cross-translation-unit checker.
+A hands-on lab for learning **Clang's source-level CFG (`clang/Analysis/CFG.h`), the classic analyses built on it, and the FlowSensitive dataflow framework** by running real tools against real code. It goes from reading `clang --analyze -Xclang -analyzer-checker=debug.DumpCFG` output to writing, testing and packaging a flow-sensitive checker. Parts 8 to 11 then add the inter-procedural dimension, from introduction to advanced: `clang::CallGraph` and `AnyCall`, algorithms over the graph (orders, SCCs, metrics, witness paths), interprocedural analyses (summaries, call strings, the Static Analyzer's inlining, `BodyFarm`), and the graph's holes and limits (function pointers, virtual calls, `clang::index`, cross-translation-unit analysis, scale).
 
 Every API in the lab was checked against the installed LLVM 22.1.8 headers. Where older tutorials are wrong for Clang 22 (`ControlFlowContext.h` is now `AdornedCFG.h`, `CFGStmtMap::Build` is a constructor, `Environment` has no `SkipPast`, there is no `RecordValue`), the lab says so where it matters.
 
@@ -27,7 +27,10 @@ Every API in the lab was checked against the installed LLVM 22.1.8 headers. Wher
 | 5 | [Classic CFG Analyses](part_5_classic_analyses.md) | liveness · dead stores · uninitialised values · unreachable code · thread safety / consumed / called-once · lifetime safety · `CFGCallback` · how Sema composes them |
 | 6 | [The FlowSensitive Dataflow Framework](part_6_dataflow_framework.md) | lattices · `DataflowAnalysis` · `AdornedCFG` · widening · `Environment` · flow conditions and SAT · match switches · built-in models · debugging |
 | 7 | [Capstone & Engineering](part_7_capstone.md) | design and implement a checker · whole-TU driver and budgets · test harness · context sensitivity · packaging · performance |
-| 8 | [Call Graphs](part_8_call_graphs.md) | `clang::CallGraph` · what it records and omits · `GraphTraits` traversals and SCCs · analyzer order · bottom-up summaries · call sites in the CFG · indirect and virtual call resolution · cross-TU merge by USR |
+| 8 | [Call Graph Fundamentals](part_8_call_graphs.md) | `clang::CallGraph`, `CallGraphNode`, `CallRecord` · names and USRs · the builder: two doors, visitor flags, incremental `addToCallGraph` · what `CGBuilder` records and omits · `AnyCall` · a hand-written call graph · DOT, JSON, `WriteGraph`, `viewGraph` |
+| 9 | [Call Graph Algorithms](part_9_call_graph_algorithms.md) | `GraphTraits` traversals (DFS, BFS, post-order, reverse post-order) · SCCs and `misc-no-recursion` · reachability and dead functions · callers · metrics · witness paths · the Static Analyzer's order and inlining configuration |
+| 10 | [Interprocedural Analysis](part_10_interprocedural_analysis.md) | call sites in the CFG · an interprocedural walk · bottom-up summaries with a fixed point · widening · k-limited call strings · `CallEvent` and inlining · `BodyFarm` · context sensitivity in the FlowSensitive framework |
+| 11 | [Indirect Calls, Cross-TU and Scale](part_11_indirect_xtu_scale.md) | function pointers · virtual calls: devirtualisation, CHA, RTA · soundness and the analyzer's `ipa` modes · `clang::index` as a second edge source · cross-TU merge by USR · Clang's real CTU · a cross-TU checker · a 3000-function translation unit |
 
 ### Section lists
 
@@ -113,18 +116,54 @@ Every API in the lab was checked against the installed LLVM 22.1.8 headers. Wher
 - 7.7 Performance and persistence
 - 7.8 Checkpoint
 
-**Part 8 — Call Graphs**
+**Part 8 — Call Graph Fundamentals**
 
 - 8.1 What a call graph is: `debug.DumpCallGraph`, the dump order and `< root >`
-- 8.2 Building a `CallGraph` in C++: nodes, `CallRecord`, names and DOT/JSON export
-- 8.3 What gets in and what stays out: `includeInGraph`, templates, implicit code, lambdas, blocks, Objective-C
-- 8.4 Traversals through `GraphTraits`: reachability, recursion and callers-of
-- 8.5 Orders: post-order, reverse post-order and the Static Analyzer's `ipa` modes
-- 8.6 Bottom-up summaries over SCCs: a transitive `noreturn` analysis with a fixed point
-- 8.7 Call sites in the CFG: `AnyCall`, callees per block and an interprocedural walk
-- 8.8 Resolving indirect and virtual calls: function pointers, devirtualisation and CHA
-- 8.9 Capstone: a cross-TU recursion and sink checker merged by USR
+- 8.2 The container: `CallGraph`, `CallGraphNode`, `CallRecord` and canonical declarations
+- 8.3 Names and identity: `printQualifiedName`, template arguments, lambdas, blocks, selectors and the USR
+- 8.4 The builder: a `DynamicRecursiveASTVisitor` with two doors, four flags and an incremental `addToCallGraph`
+- 8.5 What `CGBuilder` records: calls, constructors, `new`, initialisers, default arguments, lambdas and blocks
+- 8.6 What stays out: function pointers, block variables, `delete`, implicit destructors, virtual targets and Objective-C's rule
+- 8.7 `AnyCall`: one interface for every call-like expression and declaration
+- 8.8 Your own call graph: a visitor that records what `CGBuilder` skips, diffed against the library's
+- 8.9 Exports: the lab's DOT and JSON, the library's `WriteGraph`, `print`, `dump` and `viewGraph`
 - 8.10 Checkpoint
+
+**Part 9 — Call Graph Algorithms**
+
+- 9.1 `GraphTraits<CallGraph*>` and the generic traversals: `depth_first`, `breadth_first`, `post_order` and `ReversePostOrderTraversal`
+- 9.2 Strongly connected components: `scc_iterator`, recursion and `clang-tidy`'s `misc-no-recursion`
+- 9.3 Reachability, roots and dead functions
+- 9.4 Callers: the reverse graph, the missing `Inverse<CallGraph*>` and transitive callers
+- 9.5 Metrics: fan-in, fan-out, call sites, height and the SCC condensation
+- 9.6 Witness paths: shortest call chains and `pathfindSomeCycle`
+- 9.7 The Static Analyzer's order: `HandleDeclsCallGraph`, `-analyzer-display-progress`, `-analyzer-note-analysis-entry-points` and `debug.Stats`
+- 9.8 Inlining configuration: `mode`, `ipa`, `max-inlinable-size`, `ipa-always-inline-size`, `-analyzer-inline-max-stack-depth`, `-analyzer-inlining-mode` and the statistics switches
+- 9.9 Checkpoint
+
+**Part 10 — Interprocedural Analysis**
+
+- 10.1 Call sites in the CFG: `AnyCall` on elements, the `missing:` classes and the options that decide what the CFG has
+- 10.2 An interprocedural walk: descending into resolved callees
+- 10.3 Bottom-up summaries over SCCs: a transitive `noreturn` analysis with a fixed point
+- 10.4 Widening and the limits of a summary: `depth`, `inf` and call-site context
+- 10.5 Context sensitivity: k-limited call strings
+- 10.6 How the Static Analyzer goes interprocedural: `CallEvent` kinds, inlining versus conservative evaluation, `RuntimeDefinition` and the exploded graph
+- 10.7 `BodyFarm`: synthesised bodies for `dispatch_once`, `std::call_once` and friends
+- 10.8 Context sensitivity in the FlowSensitive framework: `ContextSensitiveOptions`, `pushCall`, `popCall`, `canDescend`
+- 10.9 Checkpoint
+
+**Part 11 — Indirect Calls, Cross-TU and Scale**
+
+- 11.1 Function pointers: address-taken sets, signature matching and the recursion they hide
+- 11.2 Virtual calls: `getDevirtualizedMethod`, class-hierarchy analysis and rapid type analysis
+- 11.3 Soundness and precision: what each rule trades, and the analyzer's `ipa=dynamic` / `dynamic-bifurcate`
+- 11.4 `clang::index` as a second source of call edges: `SymbolRole::Call`, `RelationCalledBy` and `Dyn`
+- 11.5 Cross-TU merge by USR
+- 11.6 Clang's real CTU: `clang-extdef-mapping`, `-emit-ast`, `ctu-dir`, on-demand parsing and `-analyzer-output=text`
+- 11.7 Capstone: a cross-TU recursion and sink checker
+- 11.8 Scale: a 3000-function translation unit, costs and persistence
+- 11.9 Checkpoint
 
 ## Prerequisites
 
@@ -142,16 +181,17 @@ clang-cfg-lab/
 │   ├── README.md            ← this file
 │   ├── PROGRESS.md          ← section-by-section checklist
 │   ├── AUTHORING.md         ← how to add tools, samples and sections
-│   └── part_N_<slug>.md     ← the eight parts
+│   └── part_N_<slug>.md     ← the eleven parts
 ├── manifests/               ← sample C/C++ inputs: pNN_<name>.cpp / .c
 ├── tools/                   ← one CMake project, one directory per tool
 │   ├── CMakeLists.txt       ← add_cfg_tool(), auto-discovers tools/pNN_*/
 │   ├── common/cfglab.h      ← shared helpers (platform flags, presets, names)
-│   ├── common/cglab.h       ← Part 8 helpers (call-graph snapshot, naming, DOT/JSON)
+│   ├── common/cglab.h       ← call-graph helpers of Parts 8-11 (snapshot, naming, DOT/JSON)
 │   └── pNN_<name>/main.cpp
 ├── scripts/                 ← build.sh, run.sh, dumpcfg.sh, cfgshape.sh, viewcfg.sh,
-│                              optdiff.sh, flags.sh, doccheck.py, check_links.py, check.sh,
-│                              build_site.py, check_site.py
+│                              optdiff.sh, flags.sh, ctu.sh, gen_calls.py, doccheck.py,
+│                              check_links.py, check.sh, build_site.py, check_site.py,
+│                              outviz/ (text output → graph figures; cg.py draws the call-graph tools)
 ├── build/                   ← CMake/Ninja output (build/bin/<tool>)  [git-ignored]
 ├── out/                     ← scratch output of lab commands          [git-ignored]
 └── site/                    ← generated HTML (python3 scripts/build_site.py) [git-ignored]

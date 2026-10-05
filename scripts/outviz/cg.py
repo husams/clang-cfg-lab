@@ -43,14 +43,17 @@
                        outside, highlighted), decl-only nodes external, xtu edges (call sites in the tooltips)
   p11_check            only with `--trace`: the `trace` edges of the recursion cycles and sink chains as one graph
   clang-tidy           `misc-no-recursion`: the `Frame #n: function 'a' calls function 'b'` notes of each warning are one
-                       cycle (recursive nodes, the last frame is the edge back to the start, the line of each call site)
+                       cycle (recursive nodes, the last frame is the edge back to the start, the line of each call site);
+                       a chain a pipeline printed, `tidy:  a -> b -> a` (and `lab:  ...` next to it), is drawn the same way,
+                       each edge labelled with the tags of the lines that have it
 
 A tool's own `--emit=dot` output is returned as it is (it already follows the diagram contract); one cut by head / sed
 gets its missing closing braces. The text of `scc` / `order` / `reach` / `dead` alone (no `--edges`), `summary` lines with no `via`
 (a summary with no edge of its own is left out of the figure: the Output tab lists it), `--counts`, `--emit=json`,
 plain `diag` output of p11_check, and any unknown line in a tool format (a clang warning merged into the output, the
 `lookup` lines of p08_nodes, a bash block that mixes tools in a way the shared grammar does not know) give None, like an
-output with no edge. An empty list is printed `-` by the tools and is the empty list here. A listing cut by
+output with no edge. A tool's own error line (`p09_walk: --path needs ...`) and an `exit=N` echo are not graph content and are skipped.
+An empty list is printed `-` by the tools and is the empty list here. A listing cut by
 head / sed / grep is drawn as far as its lines go: every line is a fact of its own.
 
 The None cases of the track tools: p08_build with only `flags` / `diff:` lines, or an `--incremental` table of more than
@@ -638,6 +641,9 @@ def _edge_line(cg: _Cg, toks: list[str]) -> None:
     cg.edge(toks[1], toks[3], site, kind, expr, extra)
 
 
+_TOOL_NOTE = re.compile(r"^(?:p\d\d_\w+: .+|exit=\d+)$")  # a tool's own error line (`p09_walk: --path needs two different functions`), or a doc's `echo exit=$?`
+
+
 class _Text:
     """The records of a tool output: `take` fills the call graph from node / edge lines and keeps the rest in lists."""
 
@@ -695,6 +701,8 @@ class _Text:
             self.cycles.append(_chain(m["rest"]))
         elif m := _PATHS_NOTE.match(line):
             self.paths_note = m["rest"]
+        elif _TOOL_NOTE.match(line):
+            pass  # not part of any graph: the Output tab shows it
         else:
             return False
         return True
@@ -1613,15 +1621,19 @@ def _index(text: str, cmd: str) -> str | None:
 # clang-tidy misc-no-recursion
 # --------------------------------------------------------------------------
 _TIDY_FRAME = re.compile(r"^(?P<loc>\S+?):(?P<line>\d+):\d+: note: Frame #(?P<n>\d+): function '(?P<a>.+?)' calls function '(?P<b>.+?)' here:?$")
+_TIDY_CHAIN = re.compile(r"^(?P<tag>\w+): +(?P<chain>\S+(?: -> \S+)+)$")  # `tidy:  pang -> ping -> pong -> pang`, `lab:   ...`: a chain a doc's pipeline printed
 
 
 @_parser
 def _tidy(text: str, cmd: str) -> str | None:
     """clang-tidy `misc-no-recursion`: the `Frame #n` notes of each warning are one cycle (the last frame calls the first function:
-    the edge back), each edge labelled with the line of its call; every other line is clang-tidy's and is left alone; None without a Frame."""
+    the edge back), each edge labelled with the line of its call; a chain a pipeline printed (`tidy:  a -> b -> a`) is drawn too,
+    its edges labelled with the tags of the chains that have them (`tidy, lab`); every other line is clang-tidy's and is left
+    alone; None without a Frame or a chain."""
     cg = _Cg()
     back: set[tuple[str, str]] = set()
     chain: tuple[str, str] | None = None
+    tags: dict[tuple[str, str], list[str]] = {}
     for line in text.splitlines():
         if m := _TIDY_FRAME.match(line.strip()):
             if int(m["n"]) == 1:  # a new chain: the closing edge of the one before is settled
@@ -1630,8 +1642,15 @@ def _tidy(text: str, cmd: str) -> str | None:
                 chain = None
             cg.edge(m["a"], m["b"], f"@L{m['line']}")
             chain = (m["a"], m["b"])
+        elif m := _TIDY_CHAIN.match(line.strip()):
+            names = m["chain"].split(" -> ")
+            for key in zip(names, names[1:]):
+                if m["tag"] not in tags.setdefault(key, []):
+                    tags[key].append(m["tag"])
     if chain:
         back.add(chain)
+    for (a, b), tg in tags.items():
+        cg.edge(a, b, kind=", ".join(tg))
     if not cg.edges:
         return None
     return _plain_draw(cg, "no_recursion", "", edge_cls={k: ["back"] for k in back})

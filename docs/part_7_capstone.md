@@ -1,6 +1,6 @@
 # Part 7 — Capstone & Engineering
 
-[← Part 6 — The FlowSensitive Dataflow Framework](part_6_dataflow_framework.md) | [Part 8 — Call Graphs →](part_8_call_graphs.md)
+[← Part 6 — The FlowSensitive Dataflow Framework](part_6_dataflow_framework.md) | [Part 8 — Call Graph Fundamentals →](part_8_call_graphs.md)
 
 ## What You'll Learn
 
@@ -1469,10 +1469,10 @@ build/bin/p07_persist manifests/p07_combined.cpp --roundtrip | sed -E 's/.*table
 | Classic + dataflow | Reachability cross-check, dominator-based noise reduction, back edges and WTO for budgets (7.7) |
 | Persistence | Compact tables and verdicts are small, stable and Clang-free; full dataflow state is a debugging artifact (7.7) |
 
-**What is next.** You now have the complete path from `clang --analyze` dumps (Part 1) to a packaged, tested, budgeted flow-sensitive checker. For depth: the framework's own models in `clang/Analysis/FlowSensitive/Models/` (`UncheckedOptionalAccessModel`, `UncheckedStatusOrAccessModel`, `ChromiumCheckModel`) are the production examples of what Section 7.2 built by hand; the research page `wiki/pages/research/clang-cfg-api.md` lists every source this lab was checked against; and `-dataflow-log` (Part 6.9) is the tool for the day a report is wrong and you need to see the state. Part 8 then widens the view from one function to the whole translation unit: the call graph that connects the CFGs, bottom-up summaries over it, and a cross-translation-unit checker.
+**What is next.** You now have the complete path from `clang --analyze` dumps (Part 1) to a packaged, tested, budgeted flow-sensitive checker. For depth: the framework's own models in `clang/Analysis/FlowSensitive/Models/` (`UncheckedOptionalAccessModel`, `UncheckedStatusOrAccessModel`, `ChromiumCheckModel`) are the production examples of what Section 7.2 built by hand; the research page `wiki/pages/research/clang-cfg-api.md` lists every source this lab was checked against; and `-dataflow-log` (Part 6.9) is the tool for the day a report is wrong and you need to see the state. Parts 8 to 11 then widen the view from one function to the whole translation unit and beyond: the call graph that connects the CFGs, algorithms and bottom-up summaries over it, the Static Analyzer's interprocedural machinery, and cross-translation-unit analysis.
 
 **Ready to build your own checker?** Pick a property from your own code base (an output parameter that is not set on every path, a lock released twice, an unchecked `expected`), write ten fixtures for it first, and run them through `p07_verify` before writing the first line of `transfer()`.
 
 ---
 
-[← Part 6 — The FlowSensitive Dataflow Framework](part_6_dataflow_framework.md) | [Part 8 — Call Graphs →](part_8_call_graphs.md)
+[← Part 6 — The FlowSensitive Dataflow Framework](part_6_dataflow_framework.md) | [Part 8 — Call Graph Fundamentals →](part_8_call_graphs.md)
